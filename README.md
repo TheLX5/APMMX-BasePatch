@@ -1,5 +1,5 @@
 # Archipelago's Mega Man X Base Patch
-This repository contains all the static ASM that's used to implement SMW in [Archipelago](https://github.com/ArchipelagoMW/Archipelago).
+This repository contains all the static ASM that's used to implement MMX in [Archipelago](https://github.com/ArchipelagoMW/Archipelago).
 
 ## Build
 Requires:
