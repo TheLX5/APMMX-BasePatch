@@ -44,6 +44,8 @@
 
 !validation_check = !ram+$13
 
+!unlocked_charge = !ram+$16
+
 !levels_unlocked = !ram+$40
 !levels_completed = !ram+$60
 !bosses_defeated = !ram+$80
@@ -69,6 +71,10 @@ setting_starting_lives = $AFFFE6
 setting_pickupsanity_configuration = $AFFFE7
 setting_energy_link_configuration = $AFFFE8
 setting_death_link_configuration = $AFFFE9
+setting_jammed_buster_configuration = $AFFFEA
+
+org setting_sigma_configuration
+    padbyte $FF : pad $AFFFFF
 
 org $808012
     jsl init_ram
@@ -76,6 +82,7 @@ org $808012
 org $8080A6
     jsl main_loop
     nop
+
 
 ;# Disable being given weapons on level end
 org $80B00A
@@ -177,7 +184,7 @@ org $80FEC0
         rts 
 
 
-org $AFE9B2
+org $AFEC00
 new_starting_lives:
     lda.l setting_starting_lives
     sta !lives
@@ -253,151 +260,31 @@ check_boss_unlock_middle:
         jml $80C064
 
 pushpc
-    org $80BC87
-        jml flame_mammoth_frozen_check
-    org $80B51E
-        jml flame_mammoth_frozen_check_2
-    org $80BCAB
-        jml sting_chameleon_flooded_check
-    org $80BC99
-        jml spark_mandrill_crash_check
-    org $80B512
-        jml spark_mandrill_crash_check_2
-    org $87FCEC
-        jml spark_mandrill_crash_check_3
-    org $87F66C
-        jml spark_mandrill_crash_check_4
-    org $87F6DD
-        jml spark_mandrill_crash_check_5
-    org $87F714
-        jml spark_mandrill_crash_check_6
-    org $82FA24
-        jml spark_mandrill_crash_check_7
-    org $84B110
-        jml thunder_slime_check_1
-    org $81B4C2
-        jml thunder_slime_check_2
-    org $82FE0D
-        jsl storm_eagle_weapon_check
-        nop 
+    org $81985F
+        jsl block_charge
 pullpc
 
-storm_eagle_weapon_check:
-        lda !completed_storm_eagle
-        and #$40
-        rtl 
-
-flame_mammoth_frozen_check:
-        lda !completed_chill_penguin
-        and #$0040
-        beq .return
-        jml $80BC8C
-    .return
-        jml $80BCD0
-    .2  
-        lda !completed_chill_penguin
-        and #$0040
-        beq ..return
-        jml $80B523
-    ..return
-        jml $80B528
-
-sting_chameleon_flooded_check:
-        lda !completed_launch_octopus
-        and #$0040
-        beq .return
-        jml $80BCB0
-    .return
-        jml $80BCD0
-
-spark_mandrill_crash_check:
-        lda !completed_storm_eagle
-        and #$0040
-        beq .return
-        jml $80BC9E
-    .return
-        jml $80BCD0
-    .2  
-        lda !completed_storm_eagle
-        and #$0040
-        beq ..return
-        jml $80B517
-    ..return
-        jml $80B528
-    .3  
-        lda !completed_storm_eagle
-        and #$40
-        beq ..return
-        jml $828398
-    ..return
-        jml $87FCF5
-    .4  
-        lda !completed_storm_eagle
-        and #$40
-        beq ..return
-        jml $87F676
-    ..return
-        jml $87F671
-    .5  
-        lda !completed_storm_eagle
-        and #$40
-        beq ..return
-        jml $87F6E2
-    ..return
-        jml $87F6ED
-    .6  
-        lda !completed_storm_eagle
-        and #$40
-        beq ..return
-        jml $87F719
-    ..return
-        jml $87F728
-    .7
-        lda !completed_storm_eagle
-        and #$40
-        beq ..return
-        jml $82FA29
-    ..return
-        jml $82FA3A
-thunder_slime_check:
-    .1 
-        lda !completed_storm_eagle
-        and #$40
-        bne ..return
-        jml $84B115
-    ..return
-        jml $84B127
-    .2 
-        lda !completed_storm_eagle
-        and #$40
-        beq ..return
-        jml $81B4C7
-    ..return
-        lda #$02
-        jml $81B4C9
+block_charge:
+        dec $57
+        lda.l setting_jammed_buster_configuration
+        beq .normal
+        lda !unlocked_charge
+        beq .block
+    .normal
+        lda $57
+        rtl
+    .block
+        lda #$B5
+        rtl
 
 incsrc "main_loop.asm"
 incsrc "listeners.asm"
 incsrc "locations.asm"
+incsrc "unlink.asm"
+
+incsrc "remove_antitamper.asm"
 
 incsrc "text.asm"
 
-macro a()
-pushpc
-org $819869
-    jsl block_charge
-pullpc
-
-block_charge:
-    DEC $57
-    LDA !unlocked_charge
-    BEQ .Block
-    LDA $57
-    BRA .Return
-    .Block:
-    LDA #$B5
-    .Return:
-    RTL
-endmacro
 
 ;#########################################################################

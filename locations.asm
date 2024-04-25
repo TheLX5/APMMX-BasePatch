@@ -78,21 +78,16 @@ pushpc
     org $81E4B7
         jsl check_sub_tank_collected
         nop 
-
-    org $81E641
-        jsl write_sub_tank_collected
+    org $81E63A
+        lda !upgrades_collected
+        ora $0B
+        sta !upgrades_collected
         jmp $E652
 pullpc
 
 check_sub_tank_collected:
         lda !upgrades_collected
         and $0B
-        rtl 
-
-write_sub_tank_collected:
-        lda !upgrades_collected
-        ora $0B
-        sta !upgrades_collected
         rtl 
         
 
@@ -207,28 +202,56 @@ pickupsanity:
     
     pickups:
         .intro
+            dw $FACF,$0000 ; Intro Stage - HP Pickup (after Bee Blader)
+            dw $FAD4,$0001 ; Intro Stage - Small HP Pickup (after Bee Blader)
             dw $FFFF
         .launch_octopus
+            dw $FABB,$0002 ; Launch Octopus Stage - HP Pickup (Crane platform above water)
             dw $FFFF
         .sting_chameleon
+            dw $FAD4,$0003 ; Sting Chameleon Stage - 1up Pickup (Inside second mini-cave in mountain)
+            dw $FB24,$0004 ; Sting Chameleon Stage - HP Pickup (On top of platform in the swamp)
             dw $FFFF
         .armored_armadillo
+            dw $FB65,$0005 ; Armored Armadillo Stage - HP Pickup 1 (In blocked ceiling)
+            dw $FB74,$0006 ; Armored Armadillo Stage - HP Pickup 2 (In blocked ceiling)
+            dw $FC0F,$0007 ; Armored Armadillo Stage - HP Pickup 3 (Next to Hadouken capsule)
             dw $FFFF
         .flame_mammoth
+            dw $FA43,$0008 ; Flame Mammoth Stage - HP Pickup 1 (After first conveyor belts section)
+            dw $FA9D,$0009 ; Flame Mammoth Stage - HP Pickup 2 (Top platform in Dig Labour section)
+            dw $FA7F,$000A ; Flame Mammoth Stage - 1up Pickup (Top platform in Dig Labour section)
             dw $FFFF
         .storm_eagle
+            dw $FA9D,$000B ; Storm Eagle Stage - HP Pickup 1 (Behind first set of gas tanks)
+            dw $FA98,$000C ; Storm Eagle Stage - HP Pickup 2 (Behind second set of gas tanks)
+            dw $FA93,$000D ; Storm Eagle Stage - HP Pickup 3 (Behind third set of gas tanks)
+            dw $FAA7,$001B ; Storm Eagle Stage - 1up Pickup 1 (Behind wall in third set of gas tanks)
+            dw $FB33,$000E ; Storm Eagle Stage - 1up Pickup 2 (Behind fourth set of gas tanks)
+            dw $FB3D,$000F ; Storm Eagle Stage - 1up Pickup 3 (Above helmet capsule)
+            ;dw $FBFB,$0010 ; Storm Eagle Stage - HP Pickup 4 (Right of plane)
+            ;dw $FC00,$0011 ; Storm Eagle Stage - Weapon Energy Pickup (Right of plane)
             dw $FFFF
         .spark_mandrill
             dw $FFFF
         .boomer_kuwanger
             dw $FFFF
         .chill_penguin
+            dw $FB65,$0012 ; Chill Penguin Stage - Weapon Energy Pickup (Inside third dome)
             dw $FFFF
         .sigma_1
             dw $FFFF
         .sigma_2
             dw $FFFF
         .sigma_3
+            dw $FA61,$0013 ; Sigma's Fortress 3 - HP Pickup 1 (Before Sting Chameleon rematch)
+            dw $FA84,$0014 ; Sigma's Fortress 3 - Weapon Energy Pickup 1 (Before Spark Mandrill rematch)
+            dw $FA8E,$0015 ; Sigma's Fortress 3 - HP Pickup 2 (Before Spark Mandrill rematch)
+            dw $FAF2,$0016 ; Sigma's Fortress 3 - HP Pickup 3 (Before Launch Octopus rematch)
+            dw $FAF7,$0017 ; Sigma's Fortress 3 - Weapon Energy Pickup 2 (Before Launch Octopus rematch)
+            dw $FB42,$0018 ; Sigma's Fortress 3 - HP Pickup 4 (On spikes)
+            dw $FB47,$0019 ; Sigma's Fortress 3 - Weapon Energy Pickup 3 (On Spikes)
+            dw $FB56,$001A ; Sigma's Fortress 3 - 1up Pickup (On spikes)
             dw $FFFF
         .sigma_4
             dw $FFFF

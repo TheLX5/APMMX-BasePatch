@@ -56,134 +56,208 @@ level:
 
 unlock_sigma_fortress:
         lda.l setting_sigma_configuration
-        cmp #$06
-        bcs .return
-        asl 
-        tax 
-        jmp (.ptrs,x)
-    .return
+        bne .check_medals
         rts 
 
-    .ptrs
-        dw ..multiworld
-        dw ..require_medals
-        dw ..require_weapons
-        dw ..require_armor_upgrades
-        dw ..require_heart_tanks
-        dw ..require_sub_tanks
+    .check_medals
+        lda #$00
+        pha 
+        lda.l setting_sigma_configuration
+        and #$01
+        beq ..force
+        jsr .count_medals
+        beq ..skip
+    ..force
+        lda $01,s
+        inc 
+        sta $01,s
+    ..skip
 
-    ..multiworld
+    .check_weapons
+        lda.l setting_sigma_configuration
+        and #$02
+        beq ..force
+        jsr .count_weapons
+        beq ..skip
+    ..force
+        lda $01,s
+        inc 
+        sta $01,s
+    ..skip
+
+    .check_armor_upgrades
+        lda.l setting_sigma_configuration
+        and #$04
+        beq ..force
+        jsr .count_armor_upgrades
+        beq ..skip
+    ..force
+        lda $01,s
+        inc 
+        sta $01,s
+    ..skip
+
+    .check_heart_tanks
+        lda.l setting_sigma_configuration
+        and #$08
+        beq ..force
+        jsr .count_heart_tanks
+        beq ..skip
+    ..force
+        lda $01,s
+        inc 
+        sta $01,s
+    ..skip
+
+    .check_sub_tanks
+        lda.l setting_sigma_configuration
+        and #$10
+        beq ..force
+        jsr .count_sub_tanks
+        beq ..skip
+    ..force
+        lda $01,s
+        inc 
+        sta $01,s
+    ..skip
+    
+    .unlock_check
+        pla 
+        cmp #$05
+        bcc .disable
+    .enable
+        lda #$00
+        sta.l !sigma_access
+        lda #$01
+        sta.l !levels_unlocked+$09
         rts 
+    .disable
+        lda #$FF
+        sta.l !sigma_access
+        lda #$00
+        sta.l !levels_unlocked+$09
+        rts
 
-    ..require_medals
+;############################
+
+    .count_medals
         phb 
         pea $7F7F
         plb 
         plb 
         lda #$00
         ldx #$0E
-    ...loop
+    ..loop
         bit.w !levels_completed,x
         bvc $01
         inc 
         dex #2
-        bpl ...loop
+        bpl ..loop
         plb
         cmp.l setting_sigma_medal_count
-        bcs ...enable
-        jmp ..disable
-    ...enable 
-        jmp ..enable
+        bcs ..enable
+        lda #$00
+        rts 
+    ..enable 
+        lda #$01
+        rts
 
 
-    ..require_weapons
+;############################
+
+
+    .count_weapons
         lda #$00
         ldx #$0E
-    ...loop
+    ..loop
         bit.w !weapons,x
         bvc $01
         inc 
         dex #2
-        bpl ...loop
+        bpl ..loop
         cmp.l setting_sigma_weapon_count
-        bcs ...enable
-        jmp ..disable
-    ...enable 
-        jmp ..enable
+        bcs ..enable
+        lda #$00
+        rts 
+    ..enable 
+        lda #$01
+        rts
 
 
-    ..require_armor_upgrades
+;############################
+
+
+    .count_armor_upgrades
         lda !upgrades
         and #$0F
         pha 
         ldy #$00
         ldx #$07
-    ...loop
+    ..loop
         lda $01,s
         and.l .bit_check,x
         beq $01
         iny 
         dex 
-        bpl ...loop
+        bpl ..loop
         pla 
         tya 
         cmp.l setting_sigma_armor_count
-        bcs ...enable
-        jmp ..disable
-    ...enable 
-        jmp ..enable
+        bcs ..enable
+        lda #$00
+        rts 
+    ..enable 
+        lda #$01
+        rts
+
+
+;############################
 
         
-    ..require_heart_tanks
+    .count_heart_tanks
         ldy #$00
         ldx #$07
-    ...loop
+    ..loop
         lda.w !heart_tanks
         and.l .bit_check,x
         beq $01
         iny 
         dex 
-        bpl ...loop
+        bpl ..loop
         tya 
         cmp.l setting_sigma_heart_tank_count
-        bcs ...enable
-        jmp ..disable
-    ...enable 
-        jmp ..enable
+        bcs ..enable
+        lda #$00
+        rts 
+    ..enable 
+        lda #$01
+        rts
 
 
-    ..require_sub_tanks
+;############################
+
+
+    .count_sub_tanks
         lda !upgrades
         and #$F0
         pha 
         ldy #$00
         ldx #$07
-    ...loop
+    ..loop
         lda $01,s
         and.l .bit_check,x
         beq $01
         iny 
         dex 
-        bpl ...loop
+        bpl ..loop
         pla 
         tya 
         cmp.l setting_sigma_sub_tank_count
-        bcs ...enable
-        jmp ..disable
-    ...enable 
-        jmp ..enable
-
-    ..disable 
-        lda #$FF
-        sta.l !sigma_access
+        bcs ..enable
         lda #$00
-        sta.l !levels_unlocked+$09
         rts 
-    ..enable
-        lda #$00
-        sta.l !sigma_access
+    ..enable 
         lda #$01
-        sta.l !levels_unlocked+$09
         rts
         
     .bit_check
