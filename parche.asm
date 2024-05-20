@@ -10,7 +10,7 @@
 !level_id = $1F7A
 
 !selected_level = $1E65
-
+;0BBC
 
 ; $1F1D = id of shot that just hit
 ; $1F7F goal
@@ -46,10 +46,22 @@
 
 !unlocked_charge = !ram+$16
 
+!medal_count = !ram+$17
+!fortress_backup = !ram+$18
+!current_checkpoint = !ram+$19
+
+!weapon_refill_state = !ram+$1A
+!weapon_refill_amount = !ram+$1B
+!weapon_refill_timer = !ram+$1C
+
+
 !levels_unlocked = !ram+$40
 !levels_completed = !ram+$60
 !bosses_defeated = !ram+$80
 !pickup_array = !ram+$C0
+!map_portraits_array = !ram+$E0
+!top_text_tilemap = $7FED80
+!bottom_text_tilemap = $7FEDC0
 ;80C7D0
 
 !completed_launch_octopus = !levels_completed+$00
@@ -72,6 +84,13 @@ setting_pickupsanity_configuration = $AFFFE7
 setting_energy_link_configuration = $AFFFE8
 setting_death_link_configuration = $AFFFE9
 setting_jammed_buster_configuration = $AFFFEA
+setting_boss_weakness_rando = $AFFFEC
+setting_starting_hp = $AFFFED
+setting_heart_tank_effectiveness = $AFFFEE
+setting_sigma_all_levels = $AFFFEF
+setting_boss_weakness_strictness = $AFFFF0
+
+play_sfx = $8088CD
 
 org setting_sigma_configuration
     padbyte $FF : pad $AFFFFF
@@ -82,7 +101,6 @@ org $808012
 org $8080A6
     jsl main_loop
     nop
-
 
 ;# Disable being given weapons on level end
 org $80B00A
@@ -97,9 +115,18 @@ org $80C140
     jsl check_completed_levels
     nop 
 
+;# Disables spec button
+org $80C257
+    jsl disable_spec_button
+
 ;# zero no longer gives an upgrade
 org $88D7BE
     nop #2
+
+;# Override checkpoints
+org $80E6A4
+    jsl load_different_checkpoint
+    nop #1
 
 ;# shows the cutscene
 org $80A007
@@ -170,7 +197,7 @@ org $80FEC0
         stz $D4 
         lda.l setting_starting_lives
         sta !lives
-        lda #$10
+        lda.l setting_starting_hp
         sta !max_hp
         stz $1F99
         stz $1F82
@@ -182,7 +209,6 @@ org $80FEC0
         lda #$40
         sta !exit
         rts 
-
 
 org $AFEC00
 new_starting_lives:
@@ -199,8 +225,7 @@ init_ram:
     sta.l !ram,x
     dex #2
     bpl .loop
-    sep #$30
-    rep #$20
+    sep #$10
     lda #$DEAD
     sta !validation_check
     sep #$20
@@ -237,7 +262,7 @@ check_boss_unlock:
         jml $80C05E
     .locked_level
         lda #$74
-        jsl $8088CD
+        jsl play_sfx
         pla 
         jml $80C064
 
@@ -259,6 +284,38 @@ check_boss_unlock_middle:
     .locked_level
         jml $80C064
 
+disable_spec_button:
+        cmp #$04
+        bne +
+        lda #$74
+        jsl play_sfx
+        lda #$00
+    +   
+        sta $03
+        asl 
+        tay 
+        rtl 
+
+pushpc
+    org $80CC68
+        jsl process_odd_hp_values
+        nop
+pullpc
+
+process_odd_hp_values:
+    stz $09
+    lda !max_hp
+    cmp #$02
+    bcc .adjust
+    bit #$01
+    beq .even
+    inc 
+    rtl 
+.adjust
+    lda #$02
+.even
+    rtl 
+
 pushpc
     org $81985F
         jsl block_charge
@@ -277,10 +334,45 @@ block_charge:
         lda #$B5
         rtl
 
+load_different_checkpoint:
+        lda $00D1
+        beq .use_original_ram
+        lda !upgrades
+        and #$01
+        beq .use_original_ram
+        lda !current_checkpoint
+        bmi .already_loaded
+        sta $1F81
+        lda #$80
+        sta !current_checkpoint
+    .already_loaded
+    .use_original_ram
+        rep #$20
+        lda $1F81
+        rtl 
+
+pushpc
+    org $81A0DB
+        jsl on_hadouken_cast
+    org $81A0EC
+        nop #6      ; remove hp requirement
+pullpc
+
+on_hadouken_cast:
+    lda #$18        ; forces helmet on
+    sta $0BBE
+    stz $03
+    stz $7F
+    rtl 
+
 incsrc "main_loop.asm"
 incsrc "listeners.asm"
 incsrc "locations.asm"
 incsrc "unlink.asm"
+incsrc "weakness.asm"
+incsrc "portraits.asm"
+
+print pc 
 
 incsrc "remove_antitamper.asm"
 
