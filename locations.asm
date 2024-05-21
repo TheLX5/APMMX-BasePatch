@@ -108,18 +108,26 @@ pullpc
 
 pickupsanity:
     .hp
+        lda $00D1
+        beq ..skip
         jsr .generic
         jsr .add_el_packet
+    ..skip
         lda !current_hp
         and #$7F
         rtl
     .weapon
+        lda $00D1
+        beq ..skip
         jsr .generic
         jsr .add_el_packet
+    ..skip
         lda !current_hp
         and #$7F
         rtl
     .1up
+        lda $00D1
+        beq ..skip
         jsr .generic
         rep #$20
         lda !energy_link_send_packet
@@ -127,6 +135,7 @@ pickupsanity:
         adc #$0060
         sta !energy_link_send_packet
         sep #$20
+    ..skip
         lda #$09
         cmp !lives
         rtl 
@@ -151,15 +160,10 @@ pickupsanity:
         rts 
 
     .generic
-        lda $00D1
-        cmp #$02
-        bne .skip
         lda $0B
         bmi .process
     .skip
         rts
-
-
     .process
         phx 
         phy

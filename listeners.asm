@@ -1,4 +1,6 @@
 generic_listener:
+    lda $00D1
+    beq .nope
     lda $27
     bne .nope
     lda #$01
@@ -9,6 +11,8 @@ generic_listener:
     rtl
 
 generic_listener_2:
+    lda $00D1
+    beq .nope
     lda $27
     bne .nope
     lda $01
@@ -22,6 +26,8 @@ generic_listener_2:
     rtl 
 
 maverick_listener:
+    lda $00D1
+    beq .nope
     lda $27
     bne .nope
     cpy #$02
