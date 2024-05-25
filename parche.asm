@@ -60,6 +60,9 @@
 !bosses_defeated = !ram+$80
 !pickup_array = !ram+$C0
 !map_portraits_array = !ram+$E0
+
+!weakness_table_ram = $7FED00
+
 !top_text_tilemap = $7FED80
 !bottom_text_tilemap = $7FEDC0
 ;80C7D0
@@ -211,6 +214,10 @@ org $80FEC0
         rts 
 
 org $AFEC00
+weakness_table:
+    skip (16*8)
+
+
 new_starting_lives:
     lda.l setting_starting_lives
     sta !lives
@@ -233,6 +240,15 @@ init_ram:
     sta !sigma_access
     lda #$00
     sta.l !levels_unlocked+$09
+
+    ldx #$00
+..loop
+    lda.l weakness_table,x
+    sta !weakness_table_ram,x
+    inx 
+    cpx.b #23*8
+    bne ..loop
+
     rtl
 
 check_completed_bosses:
