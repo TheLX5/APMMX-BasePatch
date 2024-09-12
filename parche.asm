@@ -10,7 +10,10 @@
 !level_id = $1F7A
 
 !selected_level = $1E65
+!checkpoint = $1F81
 ;0BBC
+!paused_game = $1F24
+!fortress_progress = $1F7B
 
 ; $1F1D = id of shot that just hit
 ; $1F7F goal
@@ -54,6 +57,38 @@
 !weapon_refill_amount = !ram+$1B
 !weapon_refill_timer = !ram+$1C
 
+!msu_fade_flags = !ram+$1D
+!msu_fade_volume = !ram+$1E
+!msu_skip_msu = !ram+$1F
+!msu_original_song = !ram+$20
+!msu_fade_limit = !ram+$21
+
+!unlocked_air_dash = !ram+$22
+
+!msu_song_backup = !ram+$23
+
+!energy_link_amount = !ram+$0100
+!level_timer_fractions = !ram+$0102
+!level_timer_seconds = !ram+$0103
+!level_timer_minutes = !ram+$0104
+!global_timer_fractions = !ram+$0106
+!global_timer_seconds = !ram+$0107
+!global_timer_minutes = !ram+$0108
+
+!total_deaths =  !ram+$010A
+!total_damage_dealt =  !ram+$010C
+!total_damage_taken =  !ram+$010E
+
+!refill_request =  !ram+$0110
+!refill_target =  !ram+$0111
+!arsenal_sync =  !ram+$0112
+!max_hp_recorded = !ram+$0114
+!selected_level_backup = !ram+$0115
+!refill_timer = !ram+$0116
+
+!checkpoints_reached = !ram+$0120
+
+!entity_ram = !ram+$30
 
 !levels_unlocked = !ram+$40
 !levels_completed = !ram+$60
@@ -61,11 +96,26 @@
 !pickup_array = !ram+$C0
 !map_portraits_array = !ram+$E0
 
-!weakness_table_ram = $7FED00
+!weakness_table_ram = $7FEC00
 
 !top_text_tilemap = $7FED80
 !bottom_text_tilemap = $7FEDC0
 ;80C7D0
+
+!msu_status = $2000
+!msu_music_id = $2002
+!msu_audio_track = $2004
+!msu_audio_volume = $2006
+!msu_audio_flags = $2007
+!msu_status_data_busy = $80
+!msu_status_audio_busy = $40
+!msu_status_audio_repeat = $20
+!msu_status_audio_playing = $10
+!msu_status_track_missing = $08
+!msu_status_revision = $07
+!msu_audio_volume_max = $FF
+!msu_audio_volume_drop = $60
+!msu_audio_volume_delta = $02
 
 !completed_launch_octopus = !levels_completed+$00
 !completed_sting_chameleon = !levels_completed+$02
@@ -76,27 +126,68 @@
 !completed_boomer_kuwanger = !levels_completed+$0C
 !completed_chill_penguin = !levels_completed+$0E
 
-setting_sigma_configuration = $AFFFE0
-setting_sigma_medal_count = $AFFFE1
-setting_sigma_weapon_count = $AFFFE2
-setting_sigma_armor_count = $AFFFE3
-setting_sigma_heart_tank_count = $AFFFE4
-setting_sigma_sub_tank_count = $AFFFE5
-setting_starting_lives = $AFFFE6
-setting_pickupsanity_configuration = $AFFFE7
-setting_energy_link_configuration = $AFFFE8
-setting_death_link_configuration = $AFFFE9
-setting_jammed_buster_configuration = $AFFFEA
-setting_boss_weakness_rando = $AFFFEC
-setting_starting_hp = $AFFFED
-setting_heart_tank_effectiveness = $AFFFEE
-setting_sigma_all_levels = $AFFFEF
-setting_boss_weakness_strictness = $AFFFF0
+!control_array = $7EFFC0
+!control_shot = !control_array+$00
+!control_jump = !control_array+$01
+!control_dash = !control_array+$02
+!control_select_l = !control_array+$03
+!control_select_r = !control_array+$04
+!control_menu = !control_array+$05
+
+!mirror_brightness = $00B3
+
+setting_sigma_configuration = $ACFC20
+setting_sigma_medal_count = $ACFC21
+setting_sigma_weapon_count = $ACFC22
+setting_sigma_armor_count = $ACFC23
+setting_sigma_heart_tank_count = $ACFC24
+setting_sigma_sub_tank_count = $ACFC25
+setting_starting_lives = $ACFC26
+setting_pickupsanity_configuration = $ACFC27
+setting_energy_link_configuration = $ACFC28
+setting_death_link_configuration = $ACFC29
+setting_jammed_buster_configuration = $ACFC2A
+setting_boss_weakness_rando = $ACFC2C
+setting_starting_hp = $ACFC2D
+setting_heart_tank_effectiveness = $ACFC2E
+setting_sigma_all_levels = $ACFC2F
+setting_boss_weakness_strictness = $ACFC30
+setting_abilities = $ACFC31
 
 play_sfx = $8088CD
+send_spc_command = $80887F
 
-org setting_sigma_configuration
-    padbyte $FF : pad $AFFFFF
+call_random = $849086
+
+;# PPU systems
+
+!palette_upload = $00A1
+!indirect_dma_queue_index = $00A3
+!direct_dma_queue_index = $00A4
+
+org $000000
+
+struct indirect_dma_queue $0500
+        .vmain: skip 1
+        .destination: skip 2
+        .size: skip 2
+        .source: skip 3
+endstruct
+
+struct direct_dma_queue $0600
+        .vmain: skip 1
+        .destination: skip 2
+        .size: skip 1
+        .data: 
+endstruct
+
+;# 2MiB ROM
+org $00FFD7
+    db $0C
+org $BFFFFF
+    db $FF
+
+incsrc "remove_antitamper.asm"
 
 org $808012
     jsl init_ram
@@ -104,6 +195,19 @@ org $808012
 org $8080A6
     jsl main_loop
     nop
+
+;# Remove text boxes
+;org $87CFEA
+    ;sep #$30
+    ;rts 
+
+;# Permanent title screen
+org $8092BD
+    rts 
+
+;# Disable demo level
+org $80900C
+    jmp $CC9E
 
 ;# Disable being given weapons on level end
 org $80B00A
@@ -166,6 +270,13 @@ org $80C957
     lda #$40
     rts 
 
+;# Remove HP threshold from vile
+org $83D71D
+    nop #2
+org $83EE8B
+    nop #2
+
+
 org $809DA8
     jsl new_starting_lives
     nop 
@@ -209,13 +320,37 @@ org $80FEC0
         stz $1F83
         stz $1F85
         sep #$20
+        lda #$00
+        sta !unlocked_air_dash
+        sta !unlocked_charge
         lda #$40
         sta !exit
+        ;jsl debug_start
         rts 
 
-org $AFEC00
+    msu_invoke_short:
+        jsl msu_invoke_long
+        rts
+    
+    start_pause_spc_command_short:
+        jsl start_pause_spc_command
+        rts 
+    
+    fix_ram_unlocks:
+        stz $1F99
+        lda #$00
+        sta !unlocked_air_dash
+        sta !unlocked_charge
+        rts 
+
+    print pc
+
+org $8091DC
+    jsr fix_ram_unlocks
+
+org $AFE9A2
 weakness_table:
-    skip (16*8)
+    skip (23*16)
 
 
 new_starting_lives:
@@ -235,19 +370,23 @@ init_ram:
     sep #$10
     lda #$DEAD
     sta !validation_check
+    lda #$1337
+    sta !arsenal_sync
     sep #$20
     lda #$FF
     sta !sigma_access
     lda #$00
     sta.l !levels_unlocked+$09
 
-    ldx #$00
+    rep #$10
+    ldx #$0000
 ..loop
     lda.l weakness_table,x
     sta !weakness_table_ram,x
     inx 
-    cpx.b #23*8
+    cpx.w #23*16
     bne ..loop
+    sep #$10
 
     rtl
 
@@ -282,6 +421,8 @@ check_boss_unlock:
         pla 
         jml $80C064
 
+;########################################################################################
+
 pushpc
     org $80C08B
         jml check_boss_unlock_middle
@@ -312,6 +453,8 @@ disable_spec_button:
         tay 
         rtl 
 
+;########################################################################################
+
 pushpc
     org $80CC68
         jsl process_odd_hp_values
@@ -332,6 +475,8 @@ process_odd_hp_values:
 .even
     rtl 
 
+;########################################################################################
+
 pushpc
     org $81985F
         jsl block_charge
@@ -350,47 +495,112 @@ block_charge:
         lda #$B5
         rtl
 
+;########################################################################################
+
 load_different_checkpoint:
         lda $00D1
         beq .use_original_ram
-        lda !upgrades
-        and #$01
-        beq .use_original_ram
         lda !current_checkpoint
         bmi .already_loaded
-        sta $1F81
+        sta !checkpoint
         lda #$80
         sta !current_checkpoint
     .already_loaded
     .use_original_ram
         rep #$20
-        lda $1F81
+        lda !checkpoint
         rtl 
 
+;########################################################################################
+
 pushpc
-    org $81A0DB
-        jsl on_hadouken_cast
-    org $81A0EC
-        nop #6      ; remove hp requirement
+    org $80DA24
+        jml boss_hp_bar_init
+    org $80DAE0
+        jsl boss_hp_bar_adjust
+        nop #2
 pullpc
 
-on_hadouken_cast:
-    lda #$18        ; forces helmet on
-    sta $0BBE
-    stz $03
-    stz $7F
-    rtl 
+boss_hp_bar_init:
+        ldx $1F0E
+        bne .draw
+        lda #$01
+        sta !max_hp_recorded
+        jml $80DA23
+    .draw
+        phy 
+        ldy $1F0E
+        lda $0027,y
+        ply 
+        and #$7F
+        cmp !max_hp_recorded
+        beq .skip
+        bcc .skip
+        sta !max_hp_recorded
+    .skip
+        jml $80DA29
 
-incsrc "main_loop.asm"
+boss_hp_bar_adjust:
+        lda !max_hp_recorded
+        sec 
+        sbc $0027,y
+        rtl 
+
 incsrc "listeners.asm"
 incsrc "locations.asm"
+incsrc "abilities.asm"
 incsrc "unlink.asm"
+incsrc "msu.asm"
 incsrc "weakness.asm"
-incsrc "portraits.asm"
 
-print pc 
+debug_start:
+        lda #$FF
+        sta !upgrades
+        lda #$FF
+        sta !heart_tanks
+        lda #$30
+        sta !max_hp
+        lda #$01
+        sta !unlocked_charge
+        sta !unlocked_air_dash
+        rep #$20
+        lda #$FFFF
+        sta !energy_link_send_packet
+        ldx #$1E
+    .loop
+        sta !levels_unlocked+$00,x
+        dex #2
+        bpl .loop
+        sep #$20
+        lda #$00
+        sta !sigma_access
+        rtl 
 
-incsrc "remove_antitamper.asm"
+org $AB8000
+    incsrc "enemy_adjuster.asm"
+    print pc
+
+warnpc $ABAAE0
+
+
+    
+org $B08000
+    incsrc "sincos.asm"
+
+org $B18000
+    incsrc "main_loop.asm"
+    incsrc "map.asm"
+    incsrc "password_menu.asm"
+    incsrc "pause_menu.asm"
+
+org $B28000
+    password_menu_blank_tilemap:
+            incbin "data/password_menu/tilemap.bin"
+    pause_menu_blank_tilemap:
+            incbin "data/pause_menu/tilemap.bin"
+
+    db "how come I need ANOTHER random string somewhere in order to get the apworld working smh"
+    db "ASDASDASDASDASDASDASDASDASDASDASD"
 
 incsrc "text.asm"
 

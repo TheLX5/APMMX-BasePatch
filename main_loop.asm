@@ -1,9 +1,11 @@
 main_loop:
+        jsr msu_fade_update
         lda $00D1
         beq .reset
         cmp #$02
         bne .return
     .playable
+        jsl clock_global_timer
         ldx $00D2
         cpx #$08
         bcs .return
@@ -14,7 +16,12 @@ main_loop:
         rtl 
     .reset
         lda #$00
-        sta !recv_index
+        sta !level_timer_fractions
+        sta !level_timer_seconds
+        sta !level_timer_minutes
+        sta !global_timer_fractions
+        sta !global_timer_seconds
+        sta !global_timer_minutes
         bra .return
 
     .game_ptrs
@@ -36,24 +43,39 @@ credits:
 ;########################################################################################
 
 map:
+        lda !selected_level
+        beq +
+        sta !selected_level_backup
+    +   
         lda !current_checkpoint
         and #$7F
         sta !current_checkpoint
         lda #$00
         sta !receiving_item
+        sta !level_timer_fractions
+        sta !level_timer_seconds
+        sta !level_timer_minutes
         jsr playback_sfx
         jsr calculate_fortress_access
         jsr draw_stage_select
+        jsr sync_medals
         rts 
+
 
 ;########################################################################################
 
 level:
+        jsr clock_level_timer
         jsr unlock_sigma_fortress
+        jsr track_checkpoints
+        lda !mirror_brightness
+        cmp #$0F
+        bne .screen_is_off
         jsr handle_heart_tank_upgrade
         jsr handle_hp_refill
         jsr handle_weapon_refill
         jsr give_1up
+    .screen_is_off
         jsr fix_softlock
         jsr playback_sfx
         rts 
@@ -207,6 +229,19 @@ unlock_sigma_fortress:
         dex 
         bpl ..loop
         pla 
+        lda.l setting_jammed_buster_configuration
+        beq +
+        lda !unlocked_charge
+        beq +
+        iny 
+    +   
+        lda.l setting_abilities
+        and #$02
+        beq +
+        lda !unlocked_air_dash
+        beq +
+        iny 
+    +   
         tya 
         cmp.l setting_sigma_armor_count
         bcs ..enable
@@ -522,19 +557,29 @@ handle_weapon_refill:
         dw .init
         dw .increment_weapon
         dw .end
-;81E032
+        
     .waiting
         rts
 
     .init
+        lda !paused_game
+        beq ..regular_gameplay
+        lda $1ED2
+        beq ..regular_gameplay
+        cmp #$09
+        bcc ..pause_weapon
+    ..regular_gameplay
         ldy $0BDB
-        bne ..weapon
+        bne ..valid_weapon
     ..no_weapon
         jsr .refill_other_weapons
         lda #$06
         sta !weapon_refill_state
         rts 
-    ..weapon
+    ..pause_weapon
+        asl 
+        tay 
+    ..valid_weapon
         lda !weapons-$02,y
         and #$3F
         cmp #$1C
@@ -565,7 +610,19 @@ handle_weapon_refill:
         bne ..not_yet
         lda #$04
         sta !weapon_refill_timer
+        lda !paused_game
+        beq ..regular_gameplay
+        lda $1ED2
+        beq ..regular_gameplay
+        cmp #$09
+        bcc ..pause_weapon
+    ..regular_gameplay
         ldy $0BDB
+        bra ..valid_weapon
+    ..pause_weapon
+        asl 
+        tay 
+    ..valid_weapon
         rep #$21
         lda !weapons-$03,y
         and #$3FFF
@@ -642,7 +699,7 @@ handle_weapon_refill:
     ..finish_weapon
         ora #$C000
         sta !weapons-$03,x
-        lda #$0016 
+        lda #$000D 
         jsl play_sfx
         lda $0002
         beq ..end
@@ -667,7 +724,7 @@ give_1up:
         lda #$00
         sta !receiving_item
         lda !lives
-        cmp #$09
+        cmp.b #99
         bcs .already_full
     .give
         inc !lives
@@ -698,313 +755,149 @@ playback_sfx:
         lda #$00
         sta !play_sfx_flag
     .return
+        rts
+
+;##########################################################
+
+track_checkpoints:
+        lda !selected_level_backup
+        cmp #$09
+        bne .normal_stage
+        clc 
+        adc !fortress_progress
+    .normal_stage
+        tax 
+        lda !checkpoint
+        and #$7F
+        cmp !checkpoints_reached,x
+        bcc .skip
+        sta !checkpoints_reached,x
+    .skip
         rts 
 
 ;##########################################################
 
-!map_mode = $1E4B
-
-draw_stage_select:
-    .game 
-        jsr count_total_medals
-
-        lda !selected_level
-        beq ..nope
-        cmp #$0A
-        bcs ..nope
-        dec 
-        asl
-        tax  
-        jsr (..ptrs,x)
-        rts 
-    ..nope
-    ..clear_tilemaps
-        ldx #$00
-        rep #$20
-        lda #$2020
-    ...loop
-        sta !top_text_tilemap,x
-        sta !bottom_text_tilemap,x
-        inx #2
-        cpx #$40
-        bne ...loop
-        sep #$20
-        rts 
-
-    ..ptrs
-        dw ..launch_octopus
-        dw ..sting_chameleon
-        dw ..armored_armadillo
-        dw ..flame_mammoth
-        dw ..storm_eagle
-        dw ..spark_mandrill
-        dw ..boomer_kuwanger
-        dw ..chill_penguin
-        dw ..sigma
-
-    ..launch_octopus
-    ..sting_chameleon
-    ..armored_armadillo
-    ..flame_mammoth
-    ..storm_eagle
-    ..spark_mandrill
-    ..boomer_kuwanger
-    ..chill_penguin
-        phx 
-        jsr ..clear_tilemaps
-        plx 
-        lda !levels_completed,x
-        and #$40
-        ;beq ...skip
-        lda !upgrades
-        and #$01
-        beq ...skip
-        lda $00AB
-        and #$30
-        beq ...no_change_checkpoint
-        lda !current_checkpoint
-        and #$7F
-        inc 
-        sta !current_checkpoint
-        lda #$2C
-        jsl play_sfx
-    ...no_change_checkpoint
-        lda !current_checkpoint
-        cmp #$03
-        bcc ...no_fix
-        lda #$00
-        sta !current_checkpoint
-    ...no_fix
-        jsr ..process_checkpoints
-    ...skip
-        rts 
-
-    ..sigma
-        jsr ..clear_tilemaps
-
-        lda $00AC
-        and #$20
-        beq ...no_change
-        lda #$2C
-        jsl play_sfx
-        inc $1F7B
-        lda $1F7B
-        cmp !fortress_backup
-        bcc ...no_change
-        stz $1F7B
-    ...no_change
-
-        ldx $1F7B
-        lda.l ...completed_level_ids,x
-        tax 
-        lda !bosses_defeated,x
-        ;beq ...skip_checkpoints
-        lda !upgrades
-        and #$01
-        beq ...skip_checkpoints
-        lda $00AB
-        and #$30
-        beq ...no_change_checkpoint
-        lda !current_checkpoint
-        and #$7F
-        inc 
-        sta !current_checkpoint
-        lda #$2C
-        jsl play_sfx
-    ...no_change_checkpoint
-        lda !current_checkpoint
-        ldy $1F7B
-        beq ...level_1
-        cpy #$01
-        beq ...level_2
-        cpy #$02
-        beq ...level_3
-    ...level_4
-        bra ...force
-    ...level_1
-        cmp #$05
-        bcc ...no_fix
-        bra ...force
-    ...level_2
+clock_level_timer:
+        lda !fortress_progress
         cmp #$04
-        bcc ...no_fix
-        bra ...force
-    ...level_3
-        cmp #$06
-        bcc ...no_fix
-    ...force
-        lda #$00
-        sta !current_checkpoint
-    ...no_fix
-        jsr ..process_checkpoints
-    ...skip_checkpoints
-
-        phb 
-        phk 
-        plb 
-        rep #$20
-        ldy #$00
-        ldx #$16
-    ...loop_text
-        lda.w ...text,y
-        cmp #$FFFF
-        beq ...done_text
-        sta !bottom_text_tilemap,x
-        inx #2
-        iny #2
-        bra ...loop_text
-    ...done_text
-        lda $1F7B
-        and #$00FF
-        asl 
-        tay 
-        lda.w ...progress,y
-        sta !bottom_text_tilemap+2,x
-        sep #$20
-        plb 
-        rts 
-
-    ...text
-        dw $3446,$346F,$3472,$3474,$3472,$3465,$3473,$3473
-        dw $FFFF
-
-    ...progress
-        dw $3431,$3432,$3433,$3434,$3435
-
-    ...completed_level_ids
-        db $08,$0D,$1E,$1F
-
-
-    ..process_checkpoints
-        lda !upgrades
-        and #$01
-        beq ...skip
-        phb 
-        phk 
-        plb 
-        rep #$20
-        ldy #$00
-        ldx #$14
-    ...loop_text
-        lda.w ...text,y
-        cmp #$FFFF
-        beq ...done_text
-        sta !top_text_tilemap,x
-        inx #2
-        iny #2
-        bra ...loop_text
-    ...done_text
-        inx #2
-        lda !current_checkpoint
-        and #$007F
-        asl 
-        tay 
-        lda.w ...progress,y
-        sta !top_text_tilemap,x
-        sep #$20
-        plb 
-    ...skip
-        rts 
-
-    ...text
-        dw $3443,$3468,$3465,$3463,$346B,$3470,$346F,$3469,$346E,$3474
-        dw $FFFF
-
-    ...progress
-        dw $3431,$3432,$3433,$3434,$3435,$3436,$3437,$3438
-        dw $3439,$343A,$343B,$343C,$343D,$343E,$343F,$3430
-
-
-
-;############################
-
-    .nmi
-        lda !selected_level
-        beq ..nope
-        cmp #$0A
-        bcs ..nope
-        dec 
-        asl 
-        tax 
-        jsr (..ptrs,x)
-        jsr ..texts
-    ..nope
-        rts 
-
-    ..texts
-        ldy #$80
-        sty $2115
-        rep #$20
-        lda #$1801
-        sta $4300
-        ldy #$7F
-        sty $4304
-
-        lda #$0820
-        sta $2116
-        lda.w #!top_text_tilemap
-        sta $4302
-        lda #$0040
-        sta $4305
-        ldy #$01
-        sty $420B
-
-        lda #$0B40
-        sta $2116
-        lda #$0040
-        sta $4305
-        ldy #$01
-        sty $420B
-
-        sep #$20
-        rts 
-
-    ..ptrs
-        dw ..launch_octopus
-        dw ..sting_chameleon
-        dw ..armored_armadillo
-        dw ..flame_mammoth
-        dw ..storm_eagle
-        dw ..spark_mandrill
-        dw ..boomer_kuwanger
-        dw ..chill_penguin
-        dw ..sigma
-
-    ..launch_octopus
-    ..sting_chameleon
-    ..armored_armadillo
-    ..flame_mammoth
-    ..storm_eagle
-    ..spark_mandrill
-    ..boomer_kuwanger
-    ..chill_penguin
-    ..sigma
-        rts 
-
-;###################################
-
-
-count_total_medals:
-        phx 
-        php 
-        sep #$30
-        phb 
-        lda #$7F
-        pha 
-        plb
-        lda #$00
-        ldx #$0E
-    .loop
-        bit.w !levels_completed,x
-        bvc $01
+        bcs .not_yet
+        lda !level_timer_fractions
         inc 
-        dex #2
-        bpl .loop
-        sta.w !medal_count
-        plb 
-        plp 
-        plx 
+        sta !level_timer_fractions
+        cmp.b #60
+        bcc .not_yet
+        lda #$00
+        sta !level_timer_fractions
+        lda !level_timer_seconds
+        inc 
+        sta !level_timer_seconds
+        cmp.b #60
+        bcc .not_yet
+        lda #$00
+        sta !level_timer_seconds
+        lda !level_timer_minutes
+        inc 
+        sta !level_timer_minutes
+        cmp.b #99
+        bcc .not_yet
+        lda.b #99
+        sta !level_timer_minutes
+    .not_yet
+        rts 
+
+clock_global_timer:
+        lda !fortress_progress
+        cmp #$04
+        bcs .copy
+        lda !global_timer_fractions
+        inc 
+        sta !global_timer_fractions
+        cmp.b #60
+        bcc .not_yet
+        lda #$00
+        sta !global_timer_fractions
+        lda !global_timer_seconds
+        inc 
+        sta !global_timer_seconds
+        cmp.b #60
+        bcc .not_yet
+        lda #$00
+        sta !global_timer_seconds
+        rep #$20
+        lda !global_timer_minutes
+        inc 
+        sta !global_timer_minutes
+        cmp.w #999
+        bcc .not_yet
+        lda.w #999
+        sta !global_timer_minutes
+    .not_yet
+        sep #$20
+        rtl 
+    .copy
+        lda !global_timer_fractions
+        sta !level_timer_fractions
+        lda !global_timer_seconds
+        sta !level_timer_seconds
+        lda !global_timer_minutes
+        sta !level_timer_minutes
+        lda !global_timer_minutes+$01
+        sta !level_timer_minutes+$01
+        rtl 
+
+sync_medals:
+        ldx #$FF
+    .armored_armadillo
+        lda !bosses_defeated+$00
+        beq +
+        txa 
+        sta !levels_completed+$04
+    +   
+    .chill_penguin
+        lda !bosses_defeated+$01
+        beq +
+        txa 
+        sta !levels_completed+$0E
+    +   
+    .spark_mandrill
+        lda !bosses_defeated+$02
+        beq +
+        txa 
+        sta !levels_completed+$0A
+    +   
+    .launch_octopus
+        lda !bosses_defeated+$03
+        beq +
+        txa 
+        sta !levels_completed+$00
+    +   
+    .boomer_kuwanger
+        lda !bosses_defeated+$04
+        beq +
+        txa 
+        sta !levels_completed+$0C
+    +   
+    .sting_chameleon
+        lda !bosses_defeated+$05
+        beq +
+        txa 
+        sta !levels_completed+$02
+    +   
+    .storm_eagle
+        lda !bosses_defeated+$06
+        beq +
+        txa 
+        sta !levels_completed+$08
+    +   
+    .flame_mammoth
+        lda !bosses_defeated+$07
+        beq +
+        txa 
+        sta !levels_completed+$06
+    +   
         rts
+
+;#############################################
 
 calculate_fortress_access:
         lda !bosses_defeated+$1E
@@ -1017,11 +910,11 @@ calculate_fortress_access:
         sta !fortress_backup
         rts
     +
-        lda $1FAF
+        lda $1F7B
         cmp #$03
         bcc +
         lda #$02
-        sta $1FAF
+        sta $1F7B
     +   
         lda.l setting_sigma_all_levels
         beq +
@@ -1045,20 +938,67 @@ calculate_fortress_access:
     +   
         rts
 
-pushpc
-    org $808188
-        jsl nmi_code
-        nop #2
-pullpc
+;#############################################
 
-nmi_code:
-        lda $00D1
-        beq .original_code
-        lda $00D2
-        bne .original_code
-        jsr draw_stage_select_nmi
-        jsl hack_portraits
-    .original_code
-        lda $0B9D
-        ora $0BA0
-        rtl
+msu_fade_update:
+        jsl msu_installed
+        beq .nope
+
+        lda !msu_fade_flags
+        beq .nope
+        cmp #$01
+        beq .fade_out
+        cmp #$02
+        beq .fade_in
+        cmp #$03 
+        beq .fade_out_with_limit
+    .nope
+        rts 
+
+    .fade_out
+        lda !msu_fade_volume
+        sec 
+        sbc.b #!msu_audio_volume_delta
+        bcs ..nope
+        lda #$00
+    ..nope
+        sta !msu_fade_volume
+        sta !msu_audio_volume
+        bne ..not_done
+        lda #$00
+        sta !msu_audio_flags
+        sta !msu_fade_flags
+    ..not_done
+        rts
+
+    .fade_in
+        lda !msu_fade_volume
+        clc 
+        adc.b #!msu_audio_volume_delta
+        bcc +
+        lda.b #!msu_audio_volume_max
+    +   
+        sta !msu_fade_volume
+        sta !msu_audio_volume
+        cmp #!msu_audio_volume_max
+        bne ..not_done
+        lda #$00
+        sta !msu_fade_flags
+    ..not_done
+        rts 
+
+    .fade_out_with_limit
+        lda !msu_fade_volume
+        sec 
+        sbc.b #!msu_audio_volume_delta
+        bcs ..nope
+        lda !msu_fade_limit
+    ..nope
+        sta !msu_fade_volume
+        sta !msu_audio_volume
+        cmp !msu_fade_limit
+        bcs ..not_done
+        lda #$00
+        sta !msu_fade_flags
+    ..not_done
+        rts

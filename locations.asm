@@ -57,11 +57,11 @@ check_body_capsule_collected:
 pushpc
     org $87CA8D
         check_capsule_hadouken_collected:
-                lda.l !hadouken_collected
-                bmi .collected
-                jml $87CAC8
+            lda.l !hadouken_collected
+            bmi .collected
+            jml $87CAC8
     org $87CAC4
-            .collected
+        .collected
     org $87D0D9
         jsl write_capsule_hadouken_collected
         rts 
@@ -136,7 +136,7 @@ pickupsanity:
         sta !energy_link_send_packet
         sep #$20
     ..skip
-        lda #$09
+        lda.b #99
         cmp !lives
         rtl 
     

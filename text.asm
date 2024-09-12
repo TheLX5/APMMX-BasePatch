@@ -23,7 +23,7 @@ pushpc
                 db $34      ; YXPCCCTT
                 dw $09CF    ; Tilemap destination
             .text
-                db "1.0.0"
+                db "1.4.0"
                 
         made_by_string:
             .header

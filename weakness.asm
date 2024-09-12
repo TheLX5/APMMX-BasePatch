@@ -35,7 +35,105 @@ pushpc
         .2  
             jsl damage_routine
             rts 
+
+    ;# Fix Thunder Slimer having a different weakness on spawn
+    org $84AE9B
+        lda #$03
+
+    org $849E75
+        jsl track_damage_dealt
+    org $849E94
+        jsl track_damage_dealt_zero
+
+    org $849D51
+        jsl track_damage_taken
+        nop #2
+    org $849F5A
+        jsl track_damage_taken
+        nop #2
+
+    org $809B5C
+        jsl track_deaths
 pullpc
+
+track_deaths:
+        rep #$20
+        lda !total_deaths
+        inc 
+        cmp.w #9999
+        bcc .not_max
+        lda.w #9999
+    .not_max
+        sta !total_deaths
+        sep #$20
+        lda #$04
+        sta $D2
+        rtl 
+
+track_damage_taken:
+        pha 
+        sec 
+        sbc $0000
+        bpl +
+        lda #$00
+    +   
+        jsr shared_track_damage_taken
+        pla
+        sec 
+        sbc $0000
+        sta !current_hp
+        rtl 
+        
+        
+shared_track_damage_taken:
+        pha 
+        lda !current_hp
+        and #$7F
+        sec 
+        sbc $01,s
+        rep #$20
+        and #$007F
+        clc 
+        adc !total_damage_taken
+        cmp.w #9999
+        bcc .not_max
+        lda.w #9999
+    .not_max
+        sta !total_damage_taken
+        sep #$20
+        pla 
+        rts
+
+track_damage_dealt:
+        jsr .shared
+        sta $27
+        lda #$11
+        rtl 
+    .zero
+        lda #$00
+        jsr .shared
+        stz $27
+        lda #$FF
+        rtl 
+
+    .shared
+        pha 
+        lda $27
+        and #$7F
+        sec 
+        sbc $01,s
+        rep #$20
+        and #$007F
+        clc 
+        adc !total_damage_dealt
+        cmp.w #9999
+        bcc ..not_max
+        lda.w #9999
+    ..not_max
+        sta !total_damage_dealt
+        sep #$20
+        pla 
+        rts
 
 
 damage_routine:
@@ -333,9 +431,13 @@ damage_routine:
 
     .process_hadouken
         pha 
+        lda $28
+        cmp #$05
+        beq ..skip
         lda $1F1D
         cmp #$04
         beq ..is_hadouken
+    ..skip
         pla 
         rts 
     ..is_hadouken
